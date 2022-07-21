@@ -5,8 +5,7 @@
 //! - Intuitive API.
 //! - First-class support for `rayon`, etc.
 //! - Efficient, allocation-free redraws.
-//! - Addition of new subbars on-the-fly.
-//! - Single-threaded multi-bars.
+//! - Addition of new subbars on-the-fly. - Single-threaded multi-bars.
 //! - Light-weight, only a single dependency.
 //!
 //! # Usage
@@ -96,6 +95,7 @@
 #![warn(missing_docs)]
 #![doc(html_root_url = "https://docs.rs/linya/0.3.0")]
 
+use spinoff::{Spinner, Spinners};
 use std::fmt;
 use std::io::{BufWriter, Stderr, Write};
 use terminal_size::{terminal_size, Height, Width};
@@ -169,6 +169,38 @@ impl Progress {
             total,
             label,
             cancelled: false,
+            spinner: None::<Spinner>,
+        };
+        self.bars.push(bar);
+        Bar(self.bars.len() - 1)
+    }
+
+    #[cfg(feature = "spinner")]
+    pub fn bar_with_spinner<S: Into<String>>(&mut self, total: usize, label: S) -> Bar {
+        let twidth = self.size.map(|(w, _)| w).unwrap_or(100);
+        let w = (twidth / 2) - 7;
+        let label: String = label.into();
+
+        // Create spinner
+        let spinner = Spinner::new(Spinners::Dots, "", Color::Blue);
+        // An initial "empty" rendering of the new bar.
+        let _ = writeln!(
+            self.out,
+            "{:<l$}      [{:->f$}]   0%",
+            label,
+            "",
+            l = twidth - w - 8 - 5,
+            f = w
+        );
+        let _ = self.out.flush();
+
+        let bar = SubBar {
+            curr: 0,
+            prev_percent: 0,
+            total,
+            label,
+            cancelled: false,
+            spinner,
         };
         self.bars.push(bar);
         Bar(self.bars.len() - 1)
@@ -232,8 +264,14 @@ impl Progress {
                 );
                 if b.cancelled {
                     let _ = write!(self.out, "{:_>f$}] ??? ", "", f = w);
+                    // if let Some(s) = &b.spinner {
+                    //     s.stop();
+                    // }
                 } else if b.curr >= b.total {
                     let _ = write!(self.out, "{:#>f$}] 100%", "", f = w);
+                    // if let Some(s) = &b.spinner {
+                    //     s.stop_and_persist("✅", "");
+                    // }
                 } else {
                     let f = (((w as u64) * (b.curr as u64) / (b.total as u64)) as usize).min(w - 1);
                     let e = (w - 1) - f;
@@ -247,6 +285,9 @@ impl Progress {
                         f = f,
                         e = e
                     );
+                    // if let Some(s) = &b.spinner {
+                    //     s.stop();
+                    // }
                 }
 
                 if !force {
@@ -370,6 +411,8 @@ struct SubBar {
     label: String,
     /// Did the user force this bar to stop?
     cancelled: bool,
+    /// Does this bar have a spinner?
+    spinner: Option<Spinner>,
 }
 
 /// A progress bar index for use with [`Progress`].

@@ -17,9 +17,14 @@ github = { repository = "fosskers/linya", branch = "master", workflow = "Tests" 
 
 [dependencies]
 terminal_size = "0.1"
+# spinoff = { version = "0.4", optional = true }
+spinoff = "0.4"
 
 [dev-dependencies]
 curl = "0.4"
 rand = "0.8"
 rayon = "1.5"
 version-sync = "0.9"
+
+# [features]
+# spinner = ["dep:spinoff"]
